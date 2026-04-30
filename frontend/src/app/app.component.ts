@@ -2,7 +2,7 @@ import { Component, OnInit, ElementRef, ViewChild, OnDestroy, HostListener } fro
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { BaseChartDirective } from 'ng2-charts';
+import { NgChartsModule } from 'ng2-charts';
 import { ChartConfiguration, ChartOptions, Chart, registerables } from 'chart.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -12,7 +12,7 @@ Chart.register(...registerables);
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, HttpClientModule, FormsModule, BaseChartDirective],
+  imports: [CommonModule, HttpClientModule, FormsModule, NgChartsModule],
   template: `
     <div class="main-container">
       
