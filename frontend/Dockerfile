@@ -1,41 +1,22 @@
 # Stage 1: Build
-FROM node:18 as build
+FROM node:18 AS build
 
 WORKDIR /app
 
-# Instalar Angular CLI
-RUN npm install -g @angular/cli
+COPY package.json package-lock.json ./
+RUN npm ci --legacy-peer-deps
 
-# Criar projeto
-RUN ng new f1-fantasy-app --directory ./ --skip-git --skip-tests --style=css --routing=false
+COPY angular.json tsconfig.json tsconfig.app.json tsconfig.spec.json ./
+COPY src ./src
 
-# Instalar libs gráficas
-RUN npm install chart.js ng2-charts three @types/three --legacy-peer-deps
-
-# Copiar todo o código fonte
-COPY ./src ./src
-
-# Instalar dependências
-RUN npm install --legacy-peer-deps
-
-# REMOVER LIMITES DE TAMANHO (Budget)
-# Isso evita o erro de "exceeded maximum budget" por causa do CSS bonito
-RUN node -e "const fs=require('fs'); const p='angular.json'; const d=JSON.parse(fs.readFileSync(p)); d.projects['f1-fantasy-app'].architect.build.configurations.production.budgets=[]; fs.writeFileSync(p, JSON.stringify(d));"
-
-# Build de Produção
-RUN ng build --configuration production
+RUN npx ng build --configuration production
 
 # Stage 2: Serve (Nginx)
 FROM nginx:alpine
 
-# 1. Copia o site compilado do Stage 1
 COPY --from=build /app/dist/f1-fantasy-app/browser /usr/share/nginx/html
 
-# 2. GARANTIA DE FOTOS: Cria a pasta explicitamente
 RUN mkdir -p /usr/share/nginx/html/assets/drivers
+COPY src/assets/ /usr/share/nginx/html/assets/
 
-# 3. Copia as imagens manualmente para dentro da pasta do servidor
-COPY ./src/assets/ /usr/share/nginx/html/assets/
-
-# 4. Copia configuração do Nginx
 COPY nginx.conf /etc/nginx/conf.d/default.conf

@@ -2,17 +2,19 @@ import { Component, OnInit, ElementRef, ViewChild, OnDestroy, HostListener } fro
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { BaseChartDirective } from 'ng2-charts';
+import { NgChartsModule } from 'ng2-charts';
 import { ChartConfiguration, ChartOptions, Chart, registerables } from 'chart.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { LoginComponent } from './auth/login.component';
+import { BetTabComponent } from './bet/bet-tab.component';
 
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, HttpClientModule, FormsModule, BaseChartDirective],
+  imports: [CommonModule, HttpClientModule, FormsModule, NgChartsModule, LoginComponent, BetTabComponent],
   template: `
     <div class="main-container">
       
@@ -30,16 +32,7 @@ Chart.register(...registerables);
         </div>
       </header>
 
-      <div *ngIf="!userId" class="login-overlay">
-        <div class="login-box">
-           <div class="f1-logo-mock">🏎️</div>
-           <h2>Acesso ao Paddock</h2>
-           <div class="input-group"><input [(ngModel)]="usernameInput" placeholder="Piloto" (keyup.enter)="actionAuth()"></div>
-           <div class="input-group"><input [(ngModel)]="passwordInput" type="password" placeholder="Senha" (keyup.enter)="actionAuth()"></div>
-           <button (click)="actionAuth()" class="btn-cta">{{ isRegistering ? 'Assinar Contrato' : 'Entrar' }}</button>
-           <p class="toggle-link" (click)="toggleMode()">{{ isRegistering ? 'Já tenho Superlicença' : 'Solicitar Superlicença' }}</p>
-        </div>
-      </div>
+      <app-login *ngIf="!userId" (authenticated)="setSess($event)"></app-login>
 
       <div *ngIf="userId" class="dashboard animate-up">
         
@@ -50,88 +43,14 @@ Chart.register(...registerables);
           <button [class.active]="activeTab === 'windtunnel'" (click)="switchTab('windtunnel')">💨 Túnel de Vento</button>
         </nav>
 
-        <div *ngIf="activeTab === 'bet'" class="tab-content bet-layout">
-          <div class="main-column">
-            <div class="panel">
-              <div class="panel-header"><h3>🚦 Grid de Largada</h3><small>Defina as posições e estratégia de pneus</small></div>
-              <div class="grid-list">
-                <div *ngFor="let i of [0,1,2,3,4,5,6,7,8,9]; let idx = index" class="driver-card">
-                  <div class="position-marker">P{{idx + 1}}</div>
-                  <div class="driver-content">
-                    <div class="driver-selection-row">
-                        <img [src]="getDriverImage(prediction.top_10[idx])" (error)="handleImageError($event)" class="driver-avatar">
-                        <div class="select-container">
-                            <select [(ngModel)]="prediction.top_10[idx]" class="premium-select" [class.filled]="prediction.top_10[idx]">
-                                <option value="" disabled selected>Selecione o Piloto...</option>
-                                <option *ngFor="let d of drivers" [value]="d.code" [disabled]="isDriverSelected(d.code, idx)">
-                                {{d.name}} #{{d.number}} ({{d.team}})
-                                </option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="tire-strategy-box">
-                        <div class="strategy-col">
-                            <span class="tire-label">LARGADA</span>
-                            <div class="tire-toggles">
-                                <button (click)="setTire(idx, 'start', 'SOFT')" [class.active]="getTire(idx, 'start') === 'SOFT'" class="tire-dot soft"></button>
-                                <button (click)="setTire(idx, 'start', 'MEDIUM')" [class.active]="getTire(idx, 'start') === 'MEDIUM'" class="tire-dot medium"></button>
-                                <button (click)="setTire(idx, 'start', 'HARD')" [class.active]="getTire(idx, 'start') === 'HARD'" class="tire-dot hard"></button>
-                            </div>
-                        </div>
-                        <div class="arrow">➜</div>
-                        <div class="strategy-col">
-                            <span class="tire-label">FINAL</span>
-                            <div class="tire-toggles">
-                                <button (click)="setTire(idx, 'end', 'SOFT')" [class.active]="getTire(idx, 'end') === 'SOFT'" class="tire-dot soft"></button>
-                                <button (click)="setTire(idx, 'end', 'MEDIUM')" [class.active]="getTire(idx, 'end') === 'MEDIUM'" class="tire-dot medium"></button>
-                                <button (click)="setTire(idx, 'end', 'HARD')" [class.active]="getTire(idx, 'end') === 'HARD'" class="tire-dot hard"></button>
-                            </div>
-                        </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div class="side-column">
-             <div class="panel">
-                <div class="panel-header"><h3>🔥 Especiais</h3></div>
-                <div class="special-input">
-                    <label>Piloto do Dia</label>
-                    <div class="special-row">
-                        <img [src]="getDriverImageByName(prediction.driver_of_day)" (error)="handleImageError($event)" class="mini-avatar">
-                        <select [(ngModel)]="prediction.driver_of_day" class="premium-select">
-                            <option value="" disabled>Escolha...</option>
-                            <option *ngFor="let d of drivers" [value]="d.name">{{d.name}}</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="special-input">
-                    <label>Maior Evolução</label>
-                    <div class="special-row">
-                        <img [src]="getDriverImageByName(prediction.most_positions_gained)" (error)="handleImageError($event)" class="mini-avatar">
-                        <select [(ngModel)]="prediction.most_positions_gained" class="premium-select">
-                            <option value="" disabled>Escolha...</option>
-                            <option *ngFor="let d of drivers" [value]="d.name">{{d.name}}</option>
-                        </select>
-                    </div>
-                </div>
-                <button (click)="submitPrediction()" class="btn-save-all">💾 SALVAR PREDIÇÃO</button>
-             </div>
-
-             <div class="panel calendar-panel">
-               <div class="panel-header"><h3>📅 Calendário 2026</h3></div>
-               <div class="calendar-list">
-                 <div *ngFor="let race of calendar" class="race-item">
-                    <div class="race-header"><span class="race-date">{{race.date}}</span><span class="race-country">{{race.gp}}</span></div>
-                    <div class="race-events"><span *ngIf="race.sprint" class="badge sprint">SPRINT</span><span class="badge race">CORRIDA</span></div>
-                 </div>
-               </div>
-             </div>
-             <div class="panel ranking-panel"><div class="panel-header"><h3>🌎 Ranking Global</h3></div><ul class="ranking-list"><li *ngFor="let u of ranking" [class.me]="u.username === username">#{{ranking.indexOf(u)+1}} {{u.username}} - {{u.total_points}} pts</li></ul></div>
-          </div>
-        </div>
+        <app-bet-tab
+          *ngIf="activeTab === 'bet'"
+          [drivers]="drivers"
+          [ranking]="ranking"
+          [calendar]="calendar"
+          [userId]="userId"
+          [username]="username">
+        </app-bet-tab>
 
         <div *ngIf="activeTab === 'analysis'" class="tab-content">
           <div class="panel ai-panel">
@@ -193,25 +112,6 @@ Chart.register(...registerables);
     :host { display: block; width: 100vw; min-height: 100vh; background: #0f1014; --bg-dark: #0f1014; --panel-bg: #1e1f26; --accent: #e10600; --text: #fff; --muted: #8a8a93; --border: #2d2e36; --soft: #ff3333; --med: #ffcc00; --hard: #f0f0f0; }
     .main-container { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg-dark); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; overflow-x: hidden; }
     
-    .bet-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; padding: 25px; max-width: 1600px; margin: 0 auto; width: 100%; box-sizing: border-box; }
-    .driver-card { display: flex; align-items: center; gap: 15px; background: #1a1b21; margin-bottom: 12px; padding: 15px; border-radius: 10px; border-left: 4px solid transparent; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    .driver-card:hover { border-left-color: var(--accent); background: #202129; transform: translateX(5px); }
-    .driver-content { flex: 1; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
-    .driver-selection-row, .special-row { display: flex; align-items: center; gap: 15px; flex: 1; min-width: 250px; }
-    .driver-avatar { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; background: #333; border: 1px solid #444; }
-    .mini-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #333; border: 1px solid #444; }
-    .select-container { flex: 1; }
-    
-    .tire-strategy-box { display: flex; align-items: center; gap: 15px; background: #131418; padding: 8px 15px; border-radius: 8px; border: 1px solid #2d2e36; }
-    .strategy-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-    .tire-label { font-size: 0.6rem; color: var(--muted); font-weight: bold; }
-    .tire-toggles { display: flex; gap: 6px; }
-    .tire-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; opacity: 0.3; background: transparent; padding: 0; }
-    .tire-dot:hover { opacity: 0.7; transform: scale(1.1); }
-    .tire-dot.active { opacity: 1; transform: scale(1.2); border-color: #fff; box-shadow: 0 0 5px currentColor; }
-    .tire-dot.soft { background-color: var(--soft); color: var(--soft); } .tire-dot.medium { background-color: var(--med); color: var(--med); } .tire-dot.hard { background-color: var(--hard); color: var(--hard); }
-    .arrow { color: var(--muted); }
-
     header { background: var(--panel-bg); border-bottom: 3px solid var(--accent); height: 70px; display: flex; align-items: center; justify-content: space-between; padding: 0 25px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
     .brand h1 { font-style: italic; margin: 0; font-size: 1.6rem; } .season-badge { background: var(--accent); padding: 2px 8px; border-radius: 4px; font-size: 0.9rem; }
     .nav-tabs { display: flex; gap: 5px; padding: 25px 25px 0; max-width: 1600px; margin: 0 auto; width: 100%; }
@@ -238,18 +138,6 @@ Chart.register(...registerables);
 
     .premium-select { background-color: #15161b; color: #fff; border: 1px solid #333; border-radius: 6px; padding: 12px 15px; width: 100%; cursor: pointer; }
     .premium-select.small { padding: 8px; font-size: 0.9rem; }
-    .btn-save-all { width: 100%; padding: 15px; background: var(--accent); color: white; border: none; font-weight: 800; cursor: pointer; border-radius: 6px; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
-    .position-marker { font-size: 1.2rem; font-weight: 900; color: var(--muted); width: 35px; text-align: center; font-style: italic; }
-    .special-input { margin-bottom: 15px; } .special-input label { display: block; margin-bottom: 5px; color: var(--accent); font-weight: bold; font-size: 0.8rem; text-transform: uppercase; }
-    .calendar-list { max-height: 350px; overflow-y: auto; }
-    .race-item { padding: 12px 15px; border-bottom: 1px solid var(--border); }
-    .race-header { display: flex; justify-content: space-between; margin-bottom: 5px; }
-    .race-date { color: var(--accent); font-weight: 800; font-size: 0.8rem; }
-    .race-country { font-weight: bold; font-size: 0.9rem; }
-    .race-events { display: flex; gap: 5px; }
-    .badge { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: bold; background: #333; color: #aaa; }
-    .badge.sprint { background: #ffcc00; color: #000; }
-    .badge.race { background: var(--accent); color: #fff; }
 
     .driver-analysis-header { display: flex; align-items: center; justify-content: space-between; background: linear-gradient(90deg, #15161b 0%, #1e1f26 100%); padding: 30px; margin: 25px; border-radius: 12px; border: 1px solid var(--border); position: relative; overflow: hidden; }
     .driver-analysis-header::after { content: ''; position: absolute; top:0; left:0; width: 5px; height: 100%; background: var(--accent); }
@@ -260,11 +148,6 @@ Chart.register(...registerables);
     .drv-team { color: var(--muted); font-size: 1.1rem; margin: 5px 0 0 0; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
     .car-img { height: 90px; object-fit: contain; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.5)); }
 
-    .login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: flex; justify-content: center; align-items: center; z-index: 100; }
-    .login-box { background: var(--panel-bg); padding: 50px; border-radius: 16px; width: 350px; text-align: center; border: 1px solid var(--border); }
-    .input-group input { width: 100%; padding: 12px; margin-bottom: 10px; background: #15161b; border: 1px solid #333; color: white; border-radius: 6px; box-sizing: border-box; }
-    .btn-cta { width: 100%; padding: 12px; background: var(--accent); border: none; color: white; border-radius: 6px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
-    .toggle-link { color: #666; margin-top: 15px; cursor: pointer; font-size: 0.9rem; text-decoration: underline; }
     .ai-controls { padding: 25px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; background: #15161b; border-bottom: 1px solid var(--border); }
     .control-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 150px; }
     .control-group label { font-size: 0.75rem; color: var(--muted); font-weight: 800; text-transform: uppercase; }
@@ -279,8 +162,8 @@ Chart.register(...registerables);
 export class AppComponent implements OnInit, OnDestroy {
   apiUrl = 'http://localhost:8000';
   activeTab = 'bet';
-  isRegistering = false; userId: number | null = null; username = '';
-  usernameInput = ''; passwordInput = ''; myPoints = 0;
+  userId: number | null = null; username = '';
+  myPoints = 0;
   drivers: any[] = []; ranking: any[] = [];
   
   calendar = [
@@ -294,8 +177,7 @@ export class AppComponent implements OnInit, OnDestroy {
     { date: '12-14 JUN', gp: 'GP do Canadá', sprint: false }
   ];
   racesList = this.calendar.map(c => c.gp.replace('GP do ', '').replace('GP da ', '').replace('GP de ', ''));
-  
-  prediction = { top_10: new Array(10).fill(''), tire_strategies: {} as any, driver_of_day: '', most_positions_gained: '' };
+
   analysisDriver = 'VER'; raceX = 'SEASON'; raceY = 'Saudi Arabia';
   analysisResult = ''; isAnalyzing = false;
   chartData: ChartConfiguration<'line'>['data'] | null = null;
@@ -552,11 +434,8 @@ export class AppComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() { this.cleanup3D(); }
   getSelectedDriverObj() { return this.drivers.find(d => d.code === this.analysisDriver); }
-  getDriverImage(code: string): string { const d = this.drivers.find(d => d.code === code); return d ? d.image : 'assets/drivers/placeholder.png'; }
-  getDriverImageByName(name: string): string { const d = this.drivers.find(d => d.name === name); return d ? d.image : 'assets/drivers/placeholder.png'; }
   handleImageError(event: any) { event.target.src = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'; }
-  isDriverSelected(code: string, idx: number) { return this.prediction.top_10.includes(code) && this.prediction.top_10[idx] !== code; }
-  
+
   // TELEMETRIA COM FALLBACK
   analyze() {
     this.isAnalyzing = true; 
@@ -595,15 +474,8 @@ export class AppComponent implements OnInit, OnDestroy {
       }
   }
 
-  submitPrediction() { alert('Estratégia salva no banco de dados!'); }
-  actionAuth() { this.isRegistering ? this.register() : this.login(); }
-  login() { this.http.post<any>(`${this.apiUrl}/login`, {username:this.usernameInput, password:this.passwordInput}).subscribe(r => this.setSess(r)); }
-  register() { this.http.post<any>(`${this.apiUrl}/register`, {username:this.usernameInput, password:this.passwordInput}).subscribe(() => { alert('Licença emitida!'); this.toggleMode(); }); }
   setSess(r:any) { this.userId=r.user_id; this.username=r.username; localStorage.setItem('f1_user', JSON.stringify(r)); this.initApp(); }
   checkSession() { const s=localStorage.getItem('f1_user'); if(s) this.setSess(JSON.parse(s)); }
   logout() { this.userId=null; localStorage.clear(); }
-  toggleMode() { this.isRegistering = !this.isRegistering; }
   initApp() { this.http.get<any[]>(`${this.apiUrl}/drivers`).subscribe(d => this.drivers = d); this.http.get<any[]>(`${this.apiUrl}/ranking`).subscribe(r => this.ranking = r); }
-  setTire(idx: number, type: 'start' | 'end', compound: string) { const code = this.prediction.top_10[idx]; if(!code) return; if(!this.prediction.tire_strategies[code]) this.prediction.tire_strategies[code] = {start:'', end:''}; this.prediction.tire_strategies[code][type] = compound; }
-  getTire(idx: number, type: 'start' | 'end') { const code = this.prediction.top_10[idx]; return (code && this.prediction.tire_strategies[code]) ? this.prediction.tire_strategies[code][type] : ''; }
 }
