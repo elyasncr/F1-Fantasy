@@ -6,13 +6,14 @@ import { NgChartsModule } from 'ng2-charts';
 import { ChartConfiguration, ChartOptions, Chart, registerables } from 'chart.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { LoginComponent } from './auth/login.component';
 
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, HttpClientModule, FormsModule, NgChartsModule],
+  imports: [CommonModule, HttpClientModule, FormsModule, NgChartsModule, LoginComponent],
   template: `
     <div class="main-container">
       
@@ -30,16 +31,7 @@ Chart.register(...registerables);
         </div>
       </header>
 
-      <div *ngIf="!userId" class="login-overlay">
-        <div class="login-box">
-           <div class="f1-logo-mock">🏎️</div>
-           <h2>Acesso ao Paddock</h2>
-           <div class="input-group"><input [(ngModel)]="usernameInput" placeholder="Piloto" (keyup.enter)="actionAuth()"></div>
-           <div class="input-group"><input [(ngModel)]="passwordInput" type="password" placeholder="Senha" (keyup.enter)="actionAuth()"></div>
-           <button (click)="actionAuth()" class="btn-cta">{{ isRegistering ? 'Assinar Contrato' : 'Entrar' }}</button>
-           <p class="toggle-link" (click)="toggleMode()">{{ isRegistering ? 'Já tenho Superlicença' : 'Solicitar Superlicença' }}</p>
-        </div>
-      </div>
+      <app-login *ngIf="!userId" (authenticated)="setSess($event)"></app-login>
 
       <div *ngIf="userId" class="dashboard animate-up">
         
@@ -260,11 +252,6 @@ Chart.register(...registerables);
     .drv-team { color: var(--muted); font-size: 1.1rem; margin: 5px 0 0 0; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
     .car-img { height: 90px; object-fit: contain; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.5)); }
 
-    .login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: flex; justify-content: center; align-items: center; z-index: 100; }
-    .login-box { background: var(--panel-bg); padding: 50px; border-radius: 16px; width: 350px; text-align: center; border: 1px solid var(--border); }
-    .input-group input { width: 100%; padding: 12px; margin-bottom: 10px; background: #15161b; border: 1px solid #333; color: white; border-radius: 6px; box-sizing: border-box; }
-    .btn-cta { width: 100%; padding: 12px; background: var(--accent); border: none; color: white; border-radius: 6px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
-    .toggle-link { color: #666; margin-top: 15px; cursor: pointer; font-size: 0.9rem; text-decoration: underline; }
     .ai-controls { padding: 25px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; background: #15161b; border-bottom: 1px solid var(--border); }
     .control-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 150px; }
     .control-group label { font-size: 0.75rem; color: var(--muted); font-weight: 800; text-transform: uppercase; }
@@ -279,8 +266,8 @@ Chart.register(...registerables);
 export class AppComponent implements OnInit, OnDestroy {
   apiUrl = 'http://localhost:8000';
   activeTab = 'bet';
-  isRegistering = false; userId: number | null = null; username = '';
-  usernameInput = ''; passwordInput = ''; myPoints = 0;
+  userId: number | null = null; username = '';
+  myPoints = 0;
   drivers: any[] = []; ranking: any[] = [];
   
   calendar = [
@@ -596,13 +583,9 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   submitPrediction() { alert('Estratégia salva no banco de dados!'); }
-  actionAuth() { this.isRegistering ? this.register() : this.login(); }
-  login() { this.http.post<any>(`${this.apiUrl}/login`, {username:this.usernameInput, password:this.passwordInput}).subscribe(r => this.setSess(r)); }
-  register() { this.http.post<any>(`${this.apiUrl}/register`, {username:this.usernameInput, password:this.passwordInput}).subscribe(() => { alert('Licença emitida!'); this.toggleMode(); }); }
   setSess(r:any) { this.userId=r.user_id; this.username=r.username; localStorage.setItem('f1_user', JSON.stringify(r)); this.initApp(); }
   checkSession() { const s=localStorage.getItem('f1_user'); if(s) this.setSess(JSON.parse(s)); }
   logout() { this.userId=null; localStorage.clear(); }
-  toggleMode() { this.isRegistering = !this.isRegistering; }
   initApp() { this.http.get<any[]>(`${this.apiUrl}/drivers`).subscribe(d => this.drivers = d); this.http.get<any[]>(`${this.apiUrl}/ranking`).subscribe(r => this.ranking = r); }
   setTire(idx: number, type: 'start' | 'end', compound: string) { const code = this.prediction.top_10[idx]; if(!code) return; if(!this.prediction.tire_strategies[code]) this.prediction.tire_strategies[code] = {start:'', end:''}; this.prediction.tire_strategies[code][type] = compound; }
   getTire(idx: number, type: 'start' | 'end') { const code = this.prediction.top_10[idx]; return (code && this.prediction.tire_strategies[code]) ? this.prediction.tire_strategies[code][type] : ''; }
