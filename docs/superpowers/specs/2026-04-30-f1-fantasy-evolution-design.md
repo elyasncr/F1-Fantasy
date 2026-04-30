@@ -42,13 +42,16 @@ Adicionalmente foram detectados riscos críticos fora do escopo principal mas qu
 
 ```
 services/
-├── f1_data_service.py       (telemetria via FastF1, substitui f1_service.py)
+├── f1_data_service.py       (telemetria via FastF1 + análise LLM contextual,
+│                             substitui f1_service.py)
 ├── season_ingest_service.py (bulk ingest + idempotência)
 ├── news_service.py          (RSS aggregator + Llama3 categorização)
 ├── scheduler_service.py     (APScheduler com SQLAlchemyJobStore)
 ├── scoring_service.py       (avalia palpites pós-corrida)
 └── auth_service.py          (bcrypt hash/verify)
 ```
+
+`f1_data_service.py` herda toda a lógica de análise LLM do `f1_service.py` atual, mas a chamada agora é parametrizada por `focus` (`pace`/`tyre`/`sectors`/`stints`/`overall`) e o prompt é montado de acordo. Cache LLM por chave `(driver, raceX, raceY, focus)` via `cachetools.TTLCache`.
 
 ### 3.2 Modelos novos (`backend/models.py`)
 
@@ -101,8 +104,8 @@ app/
 
 ### 3.4 Dependências adicionadas
 
-- Backend: `apscheduler`, `feedparser`, `alembic`, `simplexnoise` (opcional para variação procedural).
-- Frontend: `simplex-noise` (~6kb) para o particle system. Sem mais nada.
+- Backend: `apscheduler`, `feedparser`, `alembic`, `cachetools` (cache TTL em memória).
+- Frontend: `simplex-noise` (~6kb) para a esteira turbulenta no Túnel de Vento. Sem mais nada.
 - Reaproveitado: `passlib[bcrypt]` (já em `requirements.txt` mas não usado), Three.js, Chart.js, FastF1, langchain-ollama.
 
 ## 4. Fases de implementação (Vertical Slices)
@@ -111,14 +114,21 @@ app/
 
 - **R1 bcrypt:** `auth_service.py` expõe `hash_password` / `verify_password`. `main.py` deixa de armazenar senha em texto puro. Migration apaga `users` existentes.
 - **R3 Dockerfile frontend:** versionar `package.json` + `package-lock.json` em `frontend/`. Substituir `ng new` por `npm ci --legacy-peer-deps`. Build cai de minutos pra segundos.
-- **R2 parcial:** extrair apenas `LoginComponent` e `AppShellComponent` do `app.component.ts`. Abre espaço estrutural para as próximas fases sem refatorar tudo de uma vez.
+- **R2 fundação:** `app.component.ts` vira shell magro (header + nav-tabs + `<router-outlet>`-style com `*ngIf` por tab). Extrair `LoginComponent`, `BetTabComponent`. Telemetria, Hub e Túnel continuam embutidos no shell até suas próprias fases (R2 incremental — cada fase pega seu pedaço).
+- **`ApiService` esqueleto:** criado já com métodos `login`, `register`, `getDrivers`, `getRanking`, `submitPrediction`, mesmo que os outros métodos vão chegando nas próximas fases.
 - **Alembic:** `alembic init`, baseline do schema atual, sem migration de feature ainda.
 
 ### Fase 1 — Backend infraestrutura
 
 - Migration `001_season_and_news.py`: cria todos os modelos novos da seção 3.2. Seed inicial popula `Race` com calendário 2025 + 2026.
 - `season_ingest_service.bootstrap_season(year)`: itera `Race`, baixa sessão R + Q via FastF1, popula `RaceResult` + `Qualifying`. Idempotente (skip se `DriverSeasonStat` já existe pra aquela temporada). Falha por corrida loga e segue.
-- `scoring_service.score_predictions(race_slug)`: regras iniciais — top10 acerto exato 10pt, top10 ±1 posição 3pt, driver_of_day 15pt, most_positions_gained 15pt, bônus pneus (composto start/end aparece em `stints` reais) 5pt cada. Soma em `User.total_points`, marca `Prediction.points_earned`.
+- `scoring_service.score_predictions(race_slug)`: regras iniciais —
+  - top10 acerto exato: 10pt por posição correta
+  - top10 ±1 posição (e não exato): 3pt por posição
+  - driver_of_day correto: 15pt
+  - most_positions_gained correto: 15pt
+  - bônus de pneus: 5pt se composto previsto em `start` aparece nos stints reais do piloto + 5pt independentes para o composto previsto em `end` (máx 10pt por piloto, conferidos separadamente)
+  - Soma em `User.total_points`, marca `Prediction.points_earned`.
 - `news_service.fetch_all()`: RSS de Motorsport.com, Autosport, F1.com via `feedparser`. Pipeline por artigo: parse → dedup por hash MD5 da URL → prompt Llama3 (`"A qual equipe da F1 esta notícia se refere principalmente? Responda apenas o nome ou NONE."`) → score 0-1 → save. Fallback: regex em título com nome da equipe.
 - `scheduler_service.start()`: APScheduler com `SQLAlchemyJobStore` no Postgres. Jobs:
   - `weekly_race_update` — segunda 10:00 UTC: detecta corrida do domingo anterior, atualiza `RaceResult`, recalcula stats, dispara `score_predictions`.
@@ -247,7 +257,7 @@ app/
 Fase 0 — Fundação
   ├── R1 bcrypt (auth_service + main.py)
   ├── R3 Dockerfile frontend (package.json + npm ci)
-  ├── R2 parcial (LoginComponent + AppShellComponent)
+  ├── R2 fundação (LoginComponent + BetTabComponent + ApiService)
   └── Alembic baseline
 
 Fase 1 — Backend infra
