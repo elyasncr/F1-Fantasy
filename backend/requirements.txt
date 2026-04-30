@@ -11,3 +11,10 @@ langchain-ollama
 passlib[bcrypt]
 python-jose[cryptography]
 python-multipart
+pytest
+pytest-asyncio
+httpx
+alembic
+apscheduler
+feedparser
+cachetools
