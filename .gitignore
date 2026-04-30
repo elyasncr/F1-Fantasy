@@ -6,3 +6,5 @@ __pycache__/
 backend/f1_cache/
 node_modules/
 dist/
+docs/
+docs/superpowers/
