@@ -1,0 +1,62 @@
+
+
+services:
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - db
+      - ollama
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/f1fantasy
+      - OLLAMA_URL=http://ollama:11434
+    networks:
+      - f1net
+
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    volumes:
+      # ESTA LINHA É A MÁGICA:
+      # Ela conecta sua pasta local direto no servidor.
+      # Se o arquivo estiver no seu Windows, o Docker VAI ver.
+      - ./frontend/src/assets:/usr/share/nginx/html/assets
+    restart: always
+    networks:
+      - f1net
+
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=f1fantasy
+    networks:
+      - f1net
+
+  ollama:
+    image: ollama/ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - f1net
+
+networks:
+  f1net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  ollama_data:
