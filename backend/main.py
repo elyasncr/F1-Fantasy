@@ -6,6 +6,7 @@ from typing import List, Dict, Optional
 from database import get_db, engine, Base
 import models
 from services.f1_service import F1Service
+from services.auth_service import hash_password, verify_password
 
 Base.metadata.create_all(bind=engine)
 
@@ -47,8 +48,9 @@ class AnalysisRequest(BaseModel):
 @app.post("/register")
 def register(user: UserLogin, db: Session = Depends(get_db)):
     existing = db.query(models.User).filter(models.User.username == user.username).first()
-    if existing: raise HTTPException(status_code=400, detail="Usuário já existe.")
-    new_user = models.User(username=user.username, password_hash=user.password)
+    if existing:
+        raise HTTPException(status_code=400, detail="Usuário já existe.")
+    new_user = models.User(username=user.username, password_hash=hash_password(user.password))
     db.add(new_user)
     db.commit()
     return {"user_id": new_user.id, "username": new_user.username}
@@ -56,7 +58,7 @@ def register(user: UserLogin, db: Session = Depends(get_db)):
 @app.post("/login")
 def login(user: UserLogin, db: Session = Depends(get_db)):
     db_user = db.query(models.User).filter(models.User.username == user.username).first()
-    if not db_user or db_user.password_hash != user.password:
+    if not db_user or not verify_password(user.password, db_user.password_hash):
         raise HTTPException(status_code=401, detail="Credenciais inválidas.")
     return {"user_id": db_user.id, "username": db_user.username}
 
